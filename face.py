@@ -1,36 +1,43 @@
 import cv2
-import face_recognition
 
 # Load a sample image and learn how to recognize it
-known_image = face_recognition.load_image_file("known_face.jpg")
-known_encoding = face_recognition.face_encodings(known_image)[0]
+known_image = cv2.imread("known_face.jpg")
+known_encoding = cv2.cvtColor(known_image, cv2.COLOR_BGR2RGB)
 
 # Initialize the webcam
 video_capture = cv2.VideoCapture(0)
+
+# Load the pre-trained face cascade classifier
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
 while True:
     # Capture frame-by-frame
     ret, frame = video_capture.read()
 
-    # Find all face locations and encodings in the current frame
-    face_locations = face_recognition.face_locations(frame)
-    face_encodings = face_recognition.face_encodings(frame, face_locations)
+    # Convert the frame to grayscale for face detection
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Compare each face encoding found in the current frame to the known face encoding
-    for face_encoding in face_encodings:
+    # Detect faces in the grayscale frame
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+    # Compare each detected face to the known face
+    for (x, y, w, h) in faces:
+        # Extract the face region from the color frame
+        face_image = frame[y:y+h, x:x+w]
+        face_encoding = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+
         # Compare the face encoding with the known face encoding
-        matches = face_recognition.compare_faces([known_encoding], face_encoding)
-        name = "Unknown"
-
-        if matches[0]:
-            name = "Known Person"
+        match = cv2.compareHist(known_encoding, face_encoding, cv2.HISTCMP_CORREL)
 
         # Draw a rectangle around the face
-        top, right, bottom, left = face_locations[0]
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
 
         # Write the name of the recognized person
-        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        if match > 0.7:
+            name = "Known Person"
+        else:
+            name = "Unknown"
+        cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
     # Display the resulting frame
     cv2.imshow('Video', frame)
